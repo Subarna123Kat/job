@@ -1,0 +1,15 @@
+{
+  "name": "job-applicator",
+  "version": "1.0.0",
+  "description": "Automated job application sender via GitHub Actions",
+  "main": "scripts/send.js",
+  "scripts": {
+    "send": "node scripts/send.js"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.14"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

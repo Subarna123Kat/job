@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Applicator — Auto Apply Dashboard</title>
+  <meta name="description" content="One-click bulk job application sender. Upload your CV, add company emails, send personalized applications automatically." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════
+     SETUP MODAL (shown on first visit)
+════════════════════════════════════════════════════════ -->
+<div id="setup-modal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-icon">🚀</div>
+    <h2>Connect Your GitHub Repo</h2>
+    <p>This dashboard manages your job application data directly in your private GitHub repository. One-time setup — takes 2 minutes.</p>
+
+    <ol class="modal-steps">
+      <li>Create a <strong>private GitHub repository</strong> and push this project to it.</li>
+      <li>Go to <a href="https://github.com/settings/tokens/new" target="_blank">github.com/settings/tokens/new</a> → Generate a <strong>Classic PAT</strong> with <code>repo</code> + <code>workflow</code> scopes.</li>
+      <li>In your repo → <strong>Settings → Secrets → Actions</strong>, add <code>GMAIL_USER</code> and <code>GMAIL_APP_PASSWORD</code>.</li>
+    </ol>
+
+    <div class="divider"></div>
+
+    <div class="form-group">
+      <label class="form-label" for="setup-token">GitHub Personal Access Token</label>
+      <input id="setup-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+      <div class="form-hint">Your PAT is stored only in this browser (localStorage). Never shared.</div>
+    </div>
+    <div class="flex gap-8">
+      <div class="form-group" style="flex:1">
+        <label class="form-label" for="setup-owner">GitHub Username</label>
+        <input id="setup-owner" type="text" placeholder="your-username" />
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label" for="setup-repo">Repository Name</label>
+        <input id="setup-repo" type="text" placeholder="job-applicator" />
+      </div>
+    </div>
+
+    <button id="setup-btn" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:8px;" onclick="setupConnect()">
+      Connect →
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     MAIN APP
+════════════════════════════════════════════════════════ -->
+<div id="app" class="hidden">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">📧</div>
+      <h1>Job Applicator</h1>
+      <p>One-click auto apply</p>
+    </div>
+
+    <div class="nav-section-label">Manage</div>
+    <div class="nav-item active" data-section="companies" id="nav-companies">
+      <span class="nav-icon">📋</span> Companies
+      <span class="nav-badge hidden" id="companies-count"></span>
+    </div>
+    <div class="nav-item" data-section="template" id="nav-template">
+      <span class="nav-icon">✉️</span> Cover Letter
+    </div>
+    <div class="nav-item" data-section="cv" id="nav-cv">
+      <span class="nav-icon">📎</span> My CV
+    </div>
+
+    <div class="nav-section-label" style="margin-top:8px">Actions</div>
+    <div class="nav-item" data-section="send" id="nav-send">
+      <span class="nav-icon">🚀</span> Send Applications
+    </div>
+
+    <div class="nav-section-label" style="margin-top:8px">Config</div>
+    <div class="nav-item" data-section="settings" id="nav-settings">
+      <span class="nav-icon">⚙️</span> Settings
+    </div>
+
+    <div class="sidebar-footer">
+      <p>$0 · GitHub Actions · Private</p>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- Loading screen -->
+    <div id="app-loader" class="loader-screen">
+      <div class="spinner-ring"></div>
+      <span>Loading your data from GitHub...</span>
+    </div>
+
+    <div id="main-content" class="hidden">
+
+      <!-- ──────────────────────────────────────────────────────
+           SECTION: COMPANIES
+      ────────────────────────────────────────────────────── -->
+      <section id="section-companies" class="section">
+        <div class="page-header">
+          <h2>Company Emails</h2>
+          <p>Add the HR / hiring emails you want to apply to. Bulk paste or add one by one.</p>
+        </div>
+
+        <!-- Bulk paste -->
+        <div class="card">
+          <div class="card-title">Bulk Add</div>
+          <div class="form-group">
+            <label class="form-label" for="bulk-emails">Paste Emails</label>
+            <textarea id="bulk-emails" rows="5" placeholder="hr@google.com&#10;careers@microsoft.com&#10;jobs@openai.com&#10;&#10;One per line, or comma / semicolon separated"></textarea>
+            <div class="form-hint">Duplicates are automatically ignored.</div>
+          </div>
+          <button class="btn btn-primary" id="bulk-add-btn" onclick="bulkAddCompanies()">
+            ＋ Add All
+          </button>
+        </div>
+
+        <!-- Single add + list -->
+        <div class="card">
+          <div class="companies-header">
+            <div class="card-title" style="margin-bottom:0">Company List</div>
+            <span class="companies-count" id="companies-total">0 companies</span>
+          </div>
+
+          <div class="add-row" style="margin-bottom:16px">
+            <input id="single-email" type="email" placeholder="Add single: hr@company.com" onkeydown="if(event.key==='Enter')addSingleCompany()" />
+            <button class="btn btn-ghost btn-sm" onclick="addSingleCompany()">Add</button>
+            <button class="btn btn-danger btn-sm" onclick="clearAllCompanies()" id="clear-btn">Clear All</button>
+          </div>
+
+          <div id="companies-list"></div>
+        </div>
+      </section>
+
+      <!-- ──────────────────────────────────────────────────────
+           SECTION: COVER LETTER TEMPLATE
+      ────────────────────────────────────────────────────── -->
+      <section id="section-template" class="section hidden">
+        <div class="page-header">
+          <h2>Cover Letter Template</h2>
+          <p>Edit your template. Every occurrence of <strong style="color:#6366f1">your company</strong> will be replaced with the real company name.</p>
+        </div>
+
+        <div class="template-layout">
+          <div class="card" style="margin-bottom:0">
+            <div class="card-title">Template Editor</div>
+            <textarea id="template-editor" rows="22" placeholder="Write your cover letter here...&#10;&#10;Use 'your company' as a placeholder — it gets replaced automatically!"></textarea>
+            <button class="btn btn-primary mt-16" onclick="saveTemplateClick()">💾 Save Template</button>
+          </div>
+
+          <div class="card" style="margin-bottom:0">
+            <div class="template-preview-label">Live Preview (with Google)</div>
+            <div class="template-preview-box" id="template-preview">
+              Start typing in the editor to see a preview...
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ──────────────────────────────────────────────────────
+           SECTION: CV UPLOAD
+      ────────────────────────────────────────────────────── -->
+      <section id="section-cv" class="section hidden">
+        <div class="page-header">
+          <h2>My CV</h2>
+          <p>Upload your CV once. It will be attached to every application email.</p>
+        </div>
+
+        <div class="card">
+          <div id="cv-status"></div>
+
+          <div class="cv-drop-zone" id="cv-drop-zone" onclick="document.getElementById('cv-file-input').click()">
+            <div class="cv-drop-icon">📄</div>
+            <div class="cv-drop-title">Drop your CV here or click to browse</div>
+            <div class="cv-drop-sub">PDF files only · Stored privately in your GitHub repo</div>
+          </div>
+          <input type="file" id="cv-file-input" accept=".pdf" class="hidden" />
+        </div>
+
+        <div class="card">
+          <div class="card-title">Why is it stored in GitHub?</div>
+          <p class="text-sm" style="line-height:1.8">
+            Your CV is committed directly to your <strong>private</strong> repository as <code>cv/resume.pdf</code>.
+            When GitHub Actions runs, it reads the CV from the repo and attaches it to every email.
+            This means nothing is stored on any external server — it's all yours.
+          </p>
+        </div>
+      </section>
+
+      <!-- ──────────────────────────────────────────────────────
+           SECTION: SEND
+      ────────────────────────────────────────────────────── -->
+      <section id="section-send" class="section hidden">
+        <div class="page-header">
+          <h2>Send Applications</h2>
+          <p>Make sure everything is ready, then fire away. GitHub Actions handles the rest.</p>
+        </div>
+
+        <!-- Readiness checklist -->
+        <div class="card">
+          <div class="card-title">Readiness Check</div>
+          <div class="checklist">
+            <div class="check-item" id="check-companies">
+              <span class="check-indicator">⬜</span>
+              <span class="check-label">Companies list</span>
+              <span class="check-value" id="check-companies-val">Loading...</span>
+            </div>
+            <div class="check-item" id="check-template">
+              <span class="check-indicator">⬜</span>
+              <span class="check-label">Cover letter template</span>
+              <span class="check-value" id="check-template-val">Loading...</span>
+            </div>
+            <div class="check-item" id="check-cv">
+              <span class="check-indicator">⬜</span>
+              <span class="check-label">CV uploaded</span>
+              <span class="check-value" id="check-cv-val">Loading...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Send hero -->
+        <div class="send-hero">
+          <h3>Ready to apply?</h3>
+          <p id="send-description">Complete the checklist above first.</p>
+          <button id="send-btn" disabled onclick="sendApplications()">
+            🚀 Send Applications
+          </button>
+          <div style="margin-top:16px; font-size:12px; color:var(--text-3)">
+            Want to test first?
+            <a href="#" onclick="sendTestApplication(); return false">Send a test to yourself →</a>
+          </div>
+        </div>
+
+        <!-- Workflow Runs -->
+        <div class="card">
+          <div class="companies-header">
+            <div class="card-title" style="margin-bottom:0">Recent Runs</div>
+            <button class="btn btn-ghost btn-sm" onclick="renderSendSection()">🔄 Refresh</button>
+          </div>
+          <div id="runs-container">
+            <div class="empty-state">No runs yet. Click Send to start!</div>
+          </div>
+          <div class="mt-16">
+            <a id="actions-link" href="#" target="_blank" class="text-sm">View all runs on GitHub →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ──────────────────────────────────────────────────────
+           SECTION: SETTINGS
+      ────────────────────────────────────────────────────── -->
+      <section id="section-settings" class="section hidden">
+        <div class="page-header">
+          <h2>Settings</h2>
+          <p>Update your GitHub connection or email details.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">GitHub Connection</div>
+          <div class="form-group">
+            <label class="form-label" for="settings-token">Personal Access Token</label>
+            <input id="settings-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+            <div class="form-hint">Classic PAT with <code>repo</code> + <code>workflow</code> permissions.</div>
+          </div>
+          <div class="flex gap-8">
+            <div class="form-group" style="flex:1">
+              <label class="form-label" for="settings-owner">GitHub Username</label>
+              <input id="settings-owner" type="text" placeholder="your-username" />
+            </div>
+            <div class="form-group" style="flex:1">
+              <label class="form-label" for="settings-repo">Repository Name</label>
+              <input id="settings-repo" type="text" placeholder="job-applicator" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Email Details</div>
+          <div class="form-group">
+            <label class="form-label" for="settings-name">Your Full Name (used in From: field)</label>
+            <input id="settings-name" type="text" placeholder="Subarna Katwal" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="settings-subject">Email Subject Line</label>
+            <input id="settings-subject" type="text" placeholder="Internship Application – Subarna Katwal" />
+          </div>
+          <div class="form-hint" style="margin-bottom:16px">
+            Gmail credentials (GMAIL_USER, GMAIL_APP_PASSWORD) are stored as <strong>GitHub Secrets</strong> in your repo — not here.
+            <a href="https://myaccount.google.com/apppasswords" target="_blank">Get Gmail App Password →</a>
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Danger Zone</div>
+          <button class="btn btn-danger" onclick="disconnectRepo()">🔌 Disconnect &amp; Reset</button>
+          <div class="form-hint mt-8">Clears your saved token from this browser. Does not affect your GitHub repo.</div>
+        </div>
+      </section>
+
+    </div><!-- /main-content -->
+  </main>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
